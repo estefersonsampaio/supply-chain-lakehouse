@@ -94,6 +94,7 @@ dbt tests: uniqueness and not-null on keys, relationships between facts and dime
 | Silver as a full refresh | Seconds at this volume and always safe to re-run; incremental MERGE is a next step |
 | A data quality gate in silver | Detected problems are reconciled with the generator manifests; any difference fails the job |
 | Risk KPI counts open orders, but flags overdue ones | A first version ignored open orders and flagged every imported component; a second one trusted them blindly and only flagged a stockout on the day it happened. The final rule matches how a planner reads it |
+| Quarantine with a status, resolved by the source | Problems are fixed in the ERP, not in the pipeline; the ERP record number links the corrected row to the quarantined one, so the team sees what is open and for how long |
 | Silver rules as pure functions tested on local Spark | Fast feedback without a cluster, same ANSI SQL behaviour as Databricks serverless |
 | Simulated data only | No real company data, not even anonymized |
 

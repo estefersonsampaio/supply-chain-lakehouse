@@ -91,7 +91,9 @@ databricks bundle run supply_chain_pipeline -p <profile>
 | Negative quantity, or zero where zero makes no sense | quarantined |
 | Material code that is not in the material master | quarantined |
 
-Quarantined rows are not dropped: they go to `sc_silver.quarantine` with the reason and the raw record, as they would need to be fixed at the source. Master data keeps the latest valid version of each record.
+Quarantined rows are not dropped: they go to `sc_silver.quarantine` with the reason, the raw record and the ERP record number. Master data keeps the latest valid version of each record.
+
+**Quarantine lifecycle.** As in a real company, problems that cannot be fixed safely in the pipeline are fixed at the source: the generator re-sends a corrected version of 70% of them a few business days later, with the same ERP record number (`R_E_C_N_O_`). Silver then marks the quarantined row as `resolved`, with the date and the days it stayed open; the others stay `open`. In the simulated quarter, 226 rows were resolved after 5 days on average and 110 are still open, all of them listed in the Data quality page of the dashboard.
 
 **Data quality gate.** Silver counts every problem it detects and compares the counts with the generator manifests in `sc_silver.dq_reconciliation`. If any count differs, the job fails. Result of the run on 8 weeks of files (24,000+ rows, 63 checks):
 
@@ -138,7 +140,7 @@ To run dbt from your machine, see [dbt/profiles.example.yml](dbt/profiles.exampl
 
 ## Dashboard
 
-A Databricks AI/BI dashboard on the gold layer, also deployed from the bundle ([dashboards/supply_chain.lvdash.json](dashboards/supply_chain.lvdash.json)): headline numbers, weekly schedule adherence, materials at risk by week, the planner's list for today and supplier performance. The March stockout is visible in both charts.
+A Databricks AI/BI dashboard on the gold layer, also deployed from the bundle ([dashboards/supply_chain.lvdash.json](dashboards/supply_chain.lvdash.json)): headline numbers, weekly schedule adherence, materials at risk by week, the planner's list for today and supplier performance. The March stockout is visible in both charts. A second page, **Data quality**, shows the quarantine (open and resolved, by reason and by week), the oldest open rows to fix at the source, and the planted vs detected reconciliation.
 
 ![Supply chain overview dashboard](docs/images/dashboard.png)
 
@@ -148,7 +150,7 @@ A Databricks AI/BI dashboard on the gold layer, also deployed from the bundle ([
 uv run pytest
 ```
 
-31 Python tests (plus the 42 dbt data tests above): the generator (reproducibility, integrity of clean data, manifest accuracy) and the silver rules on local Spark, including an end-to-end check that every problem planted in a generated dataset is detected. Local Spark needs Java 17 or 21 (`brew install openjdk@17` on macOS; `tests/conftest.py` picks it up).
+35 Python tests (plus the 42 dbt data tests above): the generator (reproducibility, integrity of clean data, manifest accuracy) and the silver rules on local Spark, including an end-to-end check that every problem planted in a generated dataset is detected. Local Spark needs Java 17 or 21 (`brew install openjdk@17` on macOS; `tests/conftest.py` picks it up).
 
 ## How to run it yourself
 

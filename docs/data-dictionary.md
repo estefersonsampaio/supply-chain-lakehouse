@@ -12,6 +12,7 @@ The generator writes ERP-style extracts: short uppercase column names with a tab
 | Movement type `D3_TM`: below 500 = entry, 500 and above = exit | `001`, `501` | Mapped to `direction` (`IN` / `OUT`) |
 | Material type `B1_TIPO` | `PA` finished product, `MP` component | Mapped to `material_type` |
 | Schedule type `ZA1_TIPO` | `F` firm, `P` forecast | Mapped to `schedule_type` |
+| ERP record number `R_E_C_N_O_` (last column of every extract) | `1834` | Kept as `erp_record_id`; it never changes, so it links a quarantined row to its corrected version |
 
 ## Extracts
 
@@ -119,6 +120,10 @@ Stock of a material = initial balance + receipts + production entries − consum
 | `D2_COD` | `material_code` | Finished product shipped |
 | `D2_QUANT` | `quantity` | Shipped quantity |
 | `D2_EMISSAO` | `shipment_date` | Shipment date |
+
+## Corrections re-sent by the source
+
+For 70% of the problems that silver quarantines in transactions (impossible dates, bad quantities, unknown materials), the generator re-sends the clean record 1 to 7 business days later, appended to that day's file with the same `R_E_C_N_O_`. The manifest counts them as `corrections_resent`. Master data needs no re-send: it arrives complete every day.
 
 ## Planted problems
 
