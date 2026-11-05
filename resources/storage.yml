@@ -1,0 +1,37 @@
+# Schemas (one per layer) and volumes.
+#
+# Databricks Free Edition cannot register external cloud storage, so the landing zone
+# is a Unity Catalog volume: the generator's CSV files are uploaded there.
+
+resources:
+  schemas:
+    sc_landing:
+      catalog_name: ${var.catalog}
+      name: sc_landing
+      comment: Raw ERP extracts as delivered (CSV files in a volume)
+    sc_bronze:
+      catalog_name: ${var.catalog}
+      name: sc_bronze
+      comment: Raw extracts as Delta tables, append-only, all columns as text
+    sc_silver:
+      catalog_name: ${var.catalog}
+      name: sc_silver
+      comment: Cleaned, typed and deduplicated data, plus quarantine tables
+    sc_gold:
+      catalog_name: ${var.catalog}
+      name: sc_gold
+      comment: Star schema and supply chain KPIs (dbt)
+
+  volumes:
+    erp_extracts:
+      catalog_name: ${var.catalog}
+      schema_name: ${resources.schemas.sc_landing.name}
+      name: erp_extracts
+      volume_type: MANAGED
+      comment: Landing zone, one folder per extract
+    checkpoints:
+      catalog_name: ${var.catalog}
+      schema_name: ${resources.schemas.sc_bronze.name}
+      name: checkpoints
+      volume_type: MANAGED
+      comment: Auto Loader schema and checkpoint locations

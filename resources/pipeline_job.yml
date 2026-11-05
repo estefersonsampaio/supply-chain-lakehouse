@@ -1,0 +1,24 @@
+resources:
+  jobs:
+    supply_chain_pipeline:
+      name: supply_chain_pipeline
+      description: Landing CSV files -> bronze Delta tables (silver and gold tasks come next)
+      max_concurrent_runs: 1
+      tasks:
+        - task_key: bronze_ingest
+          environment_key: default
+          spark_python_task:
+            python_file: ../pipelines/bronze_ingest.py
+            parameters:
+              - --catalog
+              - ${var.catalog}
+              - --landing
+              - /Volumes/${var.catalog}/${resources.schemas.sc_landing.name}/${resources.volumes.erp_extracts.name}
+              - --checkpoints
+              - /Volumes/${var.catalog}/${resources.schemas.sc_bronze.name}/${resources.volumes.checkpoints.name}
+              - --schema
+              - ${resources.schemas.sc_bronze.name}
+      environments:
+        - environment_key: default
+          spec:
+            client: "2"
