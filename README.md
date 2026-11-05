@@ -47,7 +47,7 @@ uv run python -m supply_chain_generator --days 60 --out data/landing
 planted problems: bad_quantity=89, code_format=84, decimal_comma=74, duplicate=99, ...
 ```
 
-The same seed always produces the same files, and adding days never changes the files of earlier days, which is what incremental ingestion needs. In a clean 90-day run (seed 42), customer service stays around 99% until an imported component arrives late in mid-March and service drops to 60-75% for two weeks: exactly the kind of event the KPIs have to show.
+The same seed always produces the same files, and adding days never changes the files of earlier days, which is what incremental ingestion needs. In a clean 90-day run (seed 42), customer service stays around 99% until a component arrives late in mid-March and service drops to 59-75% for two weeks: exactly the kind of event the KPIs have to show.
 
 The generator tests check reproducibility, file layout, referential integrity of the clean data, that stock never goes negative, and that the manifest matches what was actually planted.
 
@@ -126,13 +126,13 @@ The [dbt project](dbt/) builds the gold layer on the Databricks SQL warehouse an
 
 Tests cover keys, relationships between facts and dimensions, accepted values, value ranges and business rules (no receipt before its order, no receipt above the ordered quantity). A warning-level test reports negative stock: it can appear when silver quarantines movements, which is a real consequence of source data problems.
 
-**What the KPIs show in the simulated quarter.** A domestic supplier promised 2,500 lock plates for 10 March and delivered them partially on 16 March and the rest on 24 March. The component ran out on 13 March, two finished products that use it ran out from 16 to 26 March, and weekly schedule adherence dropped from 98-99% to 58% and 75%. The risk KPI flagged the component on 9 March, four business days before it ran out, when its stock fell below safety stock, and showed the 2,500 pieces as overdue from 11 March.
+**What the KPIs show in the simulated quarter.** A domestic supplier promised 2,500 lock plates for 10 March and delivered them partially on 16 March and the rest on 24 March. The component ran out on 13 March, finished products ran out between 13 and 26 March, and weekly schedule adherence dropped from 99% to 58.6% and 75.3%. The risk KPI flagged the component on 9 March, four business days before it ran out, when its stock fell below safety stock, and showed the 2,500 pieces as overdue from 11 March.
 
 | Week | Schedule adherence |
 |---|---:|
-| 2 Mar | 98.3% |
+| 2 Mar | 99.7% |
 | 9 Mar | 98.9% |
-| 16 Mar | **57.8%** |
+| 16 Mar | **58.6%** |
 | 23 Mar | **75.3%** |
 | 30 Mar | 98.7% |
 
