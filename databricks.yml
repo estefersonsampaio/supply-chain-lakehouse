@@ -16,6 +16,10 @@ variables:
   catalog:
     description: Unity Catalog catalog that holds all schemas
     default: workspace
+  warehouse_id:
+    description: SQL warehouse used by dbt (looked up by name, no ID stored here)
+    lookup:
+      warehouse: Serverless Starter Warehouse
 
 targets:
   dev:
