@@ -136,6 +136,12 @@ Tests cover keys, relationships between facts and dimensions, accepted values, v
 
 To run dbt from your machine, see [dbt/profiles.example.yml](dbt/profiles.example.yml) (it uses a short-lived token from the Databricks CLI, so no personal access token is needed).
 
+## Dashboard
+
+A Databricks AI/BI dashboard on the gold layer, also deployed from the bundle ([dashboards/supply_chain.lvdash.json](dashboards/supply_chain.lvdash.json)): headline numbers, weekly schedule adherence, materials at risk by week, the planner's list for today and supplier performance. The March stockout is visible in both charts.
+
+![Supply chain overview dashboard](docs/images/dashboard.png)
+
 ## Tests
 
 ```bash
@@ -152,7 +158,7 @@ uv run pytest
 - [x] Gold: dbt star schema, KPIs and tests
 - [x] Databricks Job deployed as code (bronze -> silver -> gold)
 - [x] CI with GitHub Actions (lint, tests on local Spark, dbt parse)
-- [ ] Dashboard
+- [x] Dashboard (Databricks AI/BI, deployed as code)
 - [ ] How to run it yourself
 
 ## Author
