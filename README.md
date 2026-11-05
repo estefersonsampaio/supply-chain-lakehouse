@@ -1,5 +1,7 @@
 # Supply chain lakehouse
 
+[![CI](https://github.com/estefersonsampaio/supply-chain-lakehouse/actions/workflows/ci.yml/badge.svg)](https://github.com/estefersonsampaio/supply-chain-lakehouse/actions/workflows/ci.yml)
+
 > **ES:** Pipeline de datos de supply chain (MRP de un proveedor de autopartes) en Databricks: ingesta incremental, capas bronze/silver/gold, modelado con dbt, tests de calidad de datos y orquestación como código. Proyecto de portfolio con datos simulados. **En construcción.**
 
 **Status: work in progress.** This README will grow with the project.
@@ -149,7 +151,7 @@ uv run pytest
 - [x] Silver: cleaning, deduplication, quarantine, data quality gate
 - [x] Gold: dbt star schema, KPIs and tests
 - [x] Databricks Job deployed as code (bronze -> silver -> gold)
-- [ ] CI with GitHub Actions
+- [x] CI with GitHub Actions (lint, tests on local Spark, dbt parse)
 - [ ] Dashboard
 - [ ] How to run it yourself
 
