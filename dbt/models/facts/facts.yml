@@ -1,0 +1,74 @@
+version: 2
+
+models:
+  - name: fct_customer_schedule
+    description: >
+      Final requested quantity per customer, material and due date, taken from the
+      latest release issued before the due date.
+    data_tests:
+      - unique_combination:
+          arguments:
+            columns: [customer_code, material_code, due_date]
+    columns:
+      - name: customer_code
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_customer')
+                field: customer_code
+      - name: material_code
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_material')
+                field: material_code
+      - name: scheduled_qty
+        data_tests: [not_null]
+
+  - name: fct_shipments
+    data_tests:
+      - unique_combination:
+          arguments:
+            columns: [shipment_doc, shipment_item]
+    columns:
+      - name: material_code
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_material')
+                field: material_code
+      - name: customer_code
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_customer')
+                field: customer_code
+
+  - name: fct_purchase_lines
+    description: One row per purchase order line, with receipts, lead time and lateness.
+    data_tests:
+      - unique_combination:
+          arguments:
+            columns: [po_number, po_item]
+    columns:
+      - name: supplier_code
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_supplier')
+                field: supplier_code
+      - name: material_code
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_material')
+                field: material_code
+
+  - name: fct_inventory_daily
+    description: Closing stock per material and business day, rebuilt from all movements.
+    data_tests:
+      - unique_combination:
+          arguments:
+            columns: [material_code, date_day]

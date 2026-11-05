@@ -1,0 +1,23 @@
+# Copy to dbt/profiles.yml (git-ignored) to run dbt from your machine.
+#
+# The token can be a short-lived OAuth token from the Databricks CLI, so no personal
+# access token needs to be created:
+#
+#   export DATABRICKS_HOST=<workspace host without https://>
+#   export DATABRICKS_HTTP_PATH=/sql/1.0/warehouses/<warehouse id>
+#   export DATABRICKS_TOKEN=$(databricks auth token -p <profile> | jq -r .access_token)
+#   uv run --group dbt dbt build --project-dir dbt --profiles-dir dbt
+#
+# In the Databricks job, the dbt task generates its own profile from the job settings.
+
+supply_chain:
+  target: dev
+  outputs:
+    dev:
+      type: databricks
+      catalog: workspace
+      schema: sc_gold
+      host: "{{ env_var('DATABRICKS_HOST') }}"
+      http_path: "{{ env_var('DATABRICKS_HTTP_PATH') }}"
+      token: "{{ env_var('DATABRICKS_TOKEN') }}"
+      threads: 4

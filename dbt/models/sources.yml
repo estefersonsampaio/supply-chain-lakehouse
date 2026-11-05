@@ -1,0 +1,25 @@
+version: 2
+
+sources:
+  - name: silver
+    description: Clean, typed tables produced by pipelines/silver_transform.py
+    schema: sc_silver
+    tables:
+      - name: materials
+        columns:
+          - name: material_code
+            data_tests: [unique, not_null]
+      - name: bom
+      - name: suppliers
+        columns:
+          - name: supplier_code
+            data_tests: [unique, not_null]
+      - name: customers
+        columns:
+          - name: customer_code
+            data_tests: [unique, not_null]
+      - name: customer_schedules
+      - name: purchase_orders
+      - name: goods_receipts
+      - name: inventory_movements
+      - name: shipments

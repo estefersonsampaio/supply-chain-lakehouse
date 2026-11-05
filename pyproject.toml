@@ -9,6 +9,9 @@ license = { text = "MIT" }
 dependencies = []
 
 [dependency-groups]
+dbt = [
+    "dbt-databricks>=1.10,<2",
+]
 dev = [
     "pytest>=8",
     "ruff>=0.6",

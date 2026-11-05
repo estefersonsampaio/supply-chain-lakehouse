@@ -1,0 +1,39 @@
+version: 2
+
+models:
+  - name: kpi_stock_coverage
+    description: >
+      Stock coverage in business days and stockout risk, per material and business day.
+      Finished products look ahead at firm customer demand; components look back at
+      their consumption.
+    data_tests:
+      - unique_combination:
+          arguments:
+            columns: [material_code, date_day]
+
+  - name: kpi_stockout_risk
+    description: Materials at risk on the latest business day (the planner's morning list).
+    columns:
+      - name: material_code
+        data_tests: [unique, not_null]
+
+  - name: kpi_supplier_performance
+    description: On-time rate and lead time per supplier, on completed purchase order lines.
+    columns:
+      - name: supplier_code
+        data_tests: [unique, not_null]
+      - name: on_time_rate
+        data_tests:
+          - accepted_range_0_1
+
+  - name: kpi_schedule_adherence
+    description: Shipped versus firm scheduled quantity per customer, material and day.
+    data_tests:
+      - unique_combination:
+          arguments:
+            columns: [customer_code, material_code, due_date]
+    columns:
+      - name: adherence
+        data_tests:
+          - not_null
+          - accepted_range_0_1
