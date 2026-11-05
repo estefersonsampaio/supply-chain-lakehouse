@@ -104,7 +104,9 @@ def _apply(issue: str, row: dict[str, str], spec: ExtractSpec, rng: random.Rando
     elif issue == BAD_QUANTITY:
         col = rng.choice(spec.qty_columns)
         value = row[col]
-        row[col] = rng.choice(("0", "-" + value if not value.startswith("-") else value))
+        negative = "-1" if float(value) == 0 else "-" + value.lstrip("-")
+        choice = rng.choice(("0", negative))
+        row[col] = negative if spec.zero_qty_allowed else choice
     elif issue == DECIMAL_COMMA:
         col = rng.choice(spec.qty_columns)
         value = row[col]

@@ -21,6 +21,9 @@ class ExtractSpec:
     date_columns: tuple[str, ...] = ()
     qty_columns: tuple[str, ...] = ()
     unit_column: str | None = None
+    # True where 0 is a legitimate quantity (a customer can schedule zero; a component
+    # may have no safety stock). There, a planted bad quantity is always negative.
+    zero_qty_allowed: bool = False
 
 
 EXTRACTS: dict[str, ExtractSpec] = {
@@ -33,6 +36,7 @@ EXTRACTS: dict[str, ExtractSpec] = {
             code_columns=("B1_COD",),
             qty_columns=("B1_ESTSEG",),
             unit_column="B1_UM",
+            zero_qty_allowed=True,
         ),
         ExtractSpec(
             name="bom",
@@ -68,6 +72,7 @@ EXTRACTS: dict[str, ExtractSpec] = {
             reference_columns=("ZA1_PROD",),
             date_columns=("ZA1_DTEMIS", "ZA1_DTENT"),
             qty_columns=("ZA1_QUANT",),
+            zero_qty_allowed=True,
         ),
         ExtractSpec(
             name="purchase_orders",

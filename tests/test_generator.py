@@ -202,3 +202,26 @@ def test_invalid_config_is_rejected():
         GeneratorConfig(days=0)
     with pytest.raises(ValueError):
         GeneratorConfig(dirty_rate=1.5)
+
+
+def test_bad_quantity_is_negative_where_zero_is_valid():
+    """A customer can schedule zero, so a planted bad quantity there must be negative."""
+    import random
+
+    from supply_chain_generator.dirt import inject
+
+    spec = EXTRACTS["customer_schedules"]
+    rows = [
+        {c: "" for c in spec.columns} | {"ZA1_QUANT": q, "ZA1_DTEMIS": "20260105"}
+        for q in ("0", "15", "120.5") * 200
+    ]
+    for row in rows:
+        row["ZA1_DTENT"] = "20260106"
+        row["ZA1_PROD"] = "PA0001".ljust(15)
+    result = inject(rows, spec, rate=1.0, rng=random.Random(7))
+    assert result.counts["bad_quantity"] > 0
+    changed = [r["ZA1_QUANT"] for r in result.rows if "," not in r["ZA1_QUANT"]]
+    originals = {"0", "15", "120.5"}
+    planted = [q for q in changed if q not in originals]
+    assert len(planted) == result.counts["bad_quantity"]
+    assert all(float(q) < 0 for q in planted)
