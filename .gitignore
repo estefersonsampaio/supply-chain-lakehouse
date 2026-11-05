@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+
+# Generated data (never commit generated extracts)
+data/
+output/
+
+# dbt
+dbt/target/
+dbt/dbt_packages/
+dbt/logs/
+dbt/profiles.yml
+
+# Databricks
+.databricks/
+
+# Secrets and local config
+.env
+.env.*
+!.env.example
+
+# macOS / editors
+.DS_Store
+.vscode/
+.idea/
