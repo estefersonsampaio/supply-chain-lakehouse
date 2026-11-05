@@ -4,6 +4,13 @@ resources:
       name: supply_chain_pipeline
       description: Landing CSV files -> bronze -> silver (data quality gate) -> gold (dbt)
       max_concurrent_runs: 1
+      # Every business day at 07:00 Madrid time, before the planners start.
+      # Paused by default so a fresh deploy does not consume compute; unpause with
+      #   databricks bundle deploy --var="schedule_status=UNPAUSED" -p <profile>
+      schedule:
+        quartz_cron_expression: "0 0 7 ? * MON-FRI"
+        timezone_id: Europe/Madrid
+        pause_status: ${var.schedule_status}
       tasks:
         - task_key: bronze_ingest
           environment_key: default

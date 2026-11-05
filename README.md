@@ -150,6 +150,44 @@ uv run pytest
 
 31 Python tests (plus the 42 dbt data tests above): the generator (reproducibility, integrity of clean data, manifest accuracy) and the silver rules on local Spark, including an end-to-end check that every problem planted in a generated dataset is detected. Local Spark needs Java 17 or 21 (`brew install openjdk@17` on macOS; `tests/conftest.py` picks it up).
 
+## How to run it yourself
+
+Everything runs on a free [Databricks Free Edition](https://www.databricks.com/learn/free-edition) workspace.
+
+**Prerequisites:** [uv](https://docs.astral.sh/uv/), the [Databricks CLI](https://docs.databricks.com/dev-tools/cli/install.html), and Java 17 or 21 if you want to run the Spark tests locally.
+
+```bash
+# 1. Install and check everything locally
+git clone https://github.com/estefersonsampaio/supply-chain-lakehouse.git
+cd supply-chain-lakehouse
+uv sync
+uv run pytest
+
+# 2. Log in to your workspace (OAuth in the browser, no token to copy)
+databricks auth login --host https://<your-workspace-host> --profile free
+
+# 3. Create schemas, volumes, the job and the dashboard
+databricks bundle deploy -p free
+
+# 4. Generate a quarter of ERP extracts and deliver the first four weeks
+uv run python -m supply_chain_generator --days 90 --out data/landing
+uv run python scripts/upload_landing.py --until 2026-01-30 --profile free
+
+# 5. Run the pipeline: bronze -> silver (data quality gate) -> dbt gold
+databricks bundle run supply_chain_pipeline -p free
+
+# 6. Deliver the rest of the quarter and run again: only the new files are loaded
+uv run python scripts/upload_landing.py --until 2026-03-31 --profile free
+databricks bundle run supply_chain_pipeline -p free
+
+# 7. Open the dashboard (the URL is in the summary)
+databricks bundle summary -p free
+```
+
+The job has a schedule for every business day at 07:00 (Madrid), paused by default. To turn it on: `databricks bundle deploy --var="schedule_status=UNPAUSED" -p free`. To remove everything from the workspace: `databricks bundle destroy -p free`.
+
+The dbt task uses the SQL warehouse called `Serverless Starter Warehouse`, which Free Edition creates for you. A full run takes about 5 minutes, most of it starting serverless compute.
+
 ## Roadmap
 
 - [x] Data generator with planted data problems
@@ -159,7 +197,9 @@ uv run pytest
 - [x] Databricks Job deployed as code (bronze -> silver -> gold)
 - [x] CI with GitHub Actions (lint, tests on local Spark, dbt parse)
 - [x] Dashboard (Databricks AI/BI, deployed as code)
-- [ ] How to run it yourself
+- [x] How to run it yourself
+
+**Next steps** (beyond the first version): incremental `MERGE` in silver instead of a full refresh; landing files in external cloud storage on a paid workspace; detecting anomalies in supplier lead times on top of gold.
 
 ## Author
 

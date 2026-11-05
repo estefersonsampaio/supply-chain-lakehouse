@@ -16,6 +16,9 @@ variables:
   catalog:
     description: Unity Catalog catalog that holds all schemas
     default: workspace
+  schedule_status:
+    description: PAUSED or UNPAUSED for the daily schedule of the pipeline job
+    default: PAUSED
   warehouse_id:
     description: SQL warehouse used by dbt (looked up by name, no ID stored here)
     lookup:
