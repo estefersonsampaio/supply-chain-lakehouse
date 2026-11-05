@@ -54,6 +54,63 @@
         "  on_time_rate, avg_lead_time_days, max_days_late\n",
         "from workspace.sc_gold.kpi_supplier_performance order by on_time_rate nulls last\n"
       ]
+    },
+    {
+      "name": "dq_headline",
+      "displayName": "DQ headline numbers",
+      "queryLines": [
+        "select\n",
+        "  (select count_if(status = 'open') from workspace.sc_silver.quarantine) as quarantine_open,\n",
+        "  (select count_if(status = 'resolved') from workspace.sc_silver.quarantine) as quarantine_resolved,\n",
+        "  (select round(avg(days_open), 1) from workspace.sc_silver.quarantine where status = 'resolved') as avg_days_to_resolve,\n",
+        "  (select round(sum(rows_quarantined) / sum(rows_in), 4) from workspace.sc_silver.dq_summary) as quarantine_rate,\n",
+        "  (select sum(duplicates_removed) from workspace.sc_silver.dq_summary) as duplicates_removed,\n",
+        "  (select round(count_if(matches) / count(*), 3) from workspace.sc_silver.dq_reconciliation) as checks_passed\n"
+      ]
+    },
+    {
+      "name": "dq_by_reason",
+      "displayName": "Quarantine by reason",
+      "queryLines": [
+        "select reason,\n",
+        "  count_if(status = 'open') as open,\n",
+        "  count_if(status = 'resolved') as resolved\n",
+        "from workspace.sc_silver.quarantine group by reason order by reason\n"
+      ]
+    },
+    {
+      "name": "dq_weekly",
+      "displayName": "Quarantine opened and resolved by week",
+      "queryLines": [
+        "with opened as (\n",
+        "  select date_trunc('week', _file_date)::date as week_start, count(*) as n from workspace.sc_silver.quarantine group by 1\n",
+        "), resolved as (\n",
+        "  select date_trunc('week', resolved_on)::date as week_start, count(*) as n from workspace.sc_silver.quarantine\n",
+        "  where resolved_on is not null group by 1\n",
+        ")\n",
+        "select coalesce(o.week_start, r.week_start) as week_start,\n",
+        "  coalesce(o.n, 0) as opened, coalesce(r.n, 0) as resolved\n",
+        "from opened o full outer join resolved r on o.week_start = r.week_start\n",
+        "order by 1\n"
+      ]
+    },
+    {
+      "name": "dq_open_list",
+      "displayName": "Open quarantine rows",
+      "queryLines": [
+        "select extract, reason, erp_record_id, _file_date as file_date, days_open, raw_record\n",
+        "from workspace.sc_silver.quarantine where status = 'open'\n",
+        "order by days_open desc, extract, erp_record_id\n"
+      ]
+    },
+    {
+      "name": "dq_reconciliation",
+      "displayName": "Planted vs detected",
+      "queryLines": [
+        "select issue, action, sum(planted) as planted, sum(detected) as detected,\n",
+        "  bool_and(matches) as all_match\n",
+        "from workspace.sc_silver.dq_reconciliation group by issue, action order by planted desc\n"
+      ]
     }
   ],
   "pages": [
@@ -691,6 +748,571 @@
             "y": 14,
             "width": 6,
             "height": 6
+          }
+        }
+      ]
+    },
+    {
+      "name": "data_quality",
+      "displayName": "Data quality",
+      "layout": [
+        {
+          "widget": {
+            "name": "dq_intro",
+            "multilineTextboxSpec": {
+              "lines": [
+                "# Data quality\n",
+                "Rows that silver could not fix go to quarantine. A row is **resolved** when the source sends a valid version of the same ERP record (same record number) in a later file; until then it stays **open**. The data quality gate compares every problem detected with the problems the generator planted."
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 6,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "dq_quarantine_open",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dq_headline",
+                  "fields": [
+                    {
+                      "name": "quarantine_open",
+                      "expression": "`quarantine_open`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "quarantine_open",
+                  "displayName": "Open in quarantine"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Open in quarantine"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 1,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "dq_quarantine_resolved",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dq_headline",
+                  "fields": [
+                    {
+                      "name": "quarantine_resolved",
+                      "expression": "`quarantine_resolved`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "quarantine_resolved",
+                  "displayName": "Resolved by the source"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Resolved by the source"
+              }
+            }
+          },
+          "position": {
+            "x": 1,
+            "y": 2,
+            "width": 1,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "dq_avg_days_to_resolve",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dq_headline",
+                  "fields": [
+                    {
+                      "name": "avg_days_to_resolve",
+                      "expression": "`avg_days_to_resolve`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "avg_days_to_resolve",
+                  "displayName": "Avg days to resolve"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Avg days to resolve"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 2,
+            "width": 1,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "dq_quarantine_rate",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dq_headline",
+                  "fields": [
+                    {
+                      "name": "quarantine_rate",
+                      "expression": "`quarantine_rate`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "quarantine_rate",
+                  "displayName": "Quarantine rate",
+                  "format": {
+                    "type": "number-percent",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Quarantine rate"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 2,
+            "width": 1,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "dq_duplicates_removed",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dq_headline",
+                  "fields": [
+                    {
+                      "name": "duplicates_removed",
+                      "expression": "`duplicates_removed`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "duplicates_removed",
+                  "displayName": "Duplicates removed"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Duplicates removed"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 2,
+            "width": 1,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "dq_checks_passed",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dq_headline",
+                  "fields": [
+                    {
+                      "name": "checks_passed",
+                      "expression": "`checks_passed`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "checks_passed",
+                  "displayName": "Quality checks passed",
+                  "format": {
+                    "type": "number-percent",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 1
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Quality checks passed"
+              }
+            }
+          },
+          "position": {
+            "x": 5,
+            "y": 2,
+            "width": 1,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "dq_reason_chart",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dq_by_reason",
+                  "fields": [
+                    {
+                      "name": "reason",
+                      "expression": "`reason`"
+                    },
+                    {
+                      "name": "open",
+                      "expression": "`open`"
+                    },
+                    {
+                      "name": "resolved",
+                      "expression": "`resolved`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "reason",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "displayName": "Reason"
+                },
+                "y": {
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "fields": [
+                    {
+                      "fieldName": "resolved",
+                      "displayName": "Resolved"
+                    },
+                    {
+                      "fieldName": "open",
+                      "displayName": "Open"
+                    }
+                  ]
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Quarantine by reason and status"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 5,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "dq_weekly_chart",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dq_weekly",
+                  "fields": [
+                    {
+                      "name": "week_start",
+                      "expression": "`week_start`"
+                    },
+                    {
+                      "name": "opened",
+                      "expression": "`opened`"
+                    },
+                    {
+                      "name": "resolved",
+                      "expression": "`resolved`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "week_start",
+                  "scale": {
+                    "type": "temporal"
+                  },
+                  "displayName": "Week"
+                },
+                "y": {
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "fields": [
+                    {
+                      "fieldName": "opened",
+                      "displayName": "Opened"
+                    },
+                    {
+                      "fieldName": "resolved",
+                      "displayName": "Resolved"
+                    }
+                  ]
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Quarantine rows opened and resolved, by week"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 5,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "dq_open_table",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dq_open_list",
+                  "fields": [
+                    {
+                      "name": "extract",
+                      "expression": "`extract`"
+                    },
+                    {
+                      "name": "reason",
+                      "expression": "`reason`"
+                    },
+                    {
+                      "name": "erp_record_id",
+                      "expression": "`erp_record_id`"
+                    },
+                    {
+                      "name": "file_date",
+                      "expression": "`file_date`"
+                    },
+                    {
+                      "name": "days_open",
+                      "expression": "`days_open`"
+                    },
+                    {
+                      "name": "raw_record",
+                      "expression": "`raw_record`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "extract",
+                    "displayName": "Extract"
+                  },
+                  {
+                    "fieldName": "reason",
+                    "displayName": "Reason"
+                  },
+                  {
+                    "fieldName": "erp_record_id",
+                    "displayName": "ERP record"
+                  },
+                  {
+                    "fieldName": "file_date",
+                    "displayName": "File date"
+                  },
+                  {
+                    "fieldName": "days_open",
+                    "displayName": "Days open"
+                  },
+                  {
+                    "fieldName": "raw_record",
+                    "displayName": "Raw record"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Open quarantine rows, oldest first (to be fixed at the source)"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 11,
+            "width": 6,
+            "height": 7
+          }
+        },
+        {
+          "widget": {
+            "name": "dq_recon_table",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dq_reconciliation",
+                  "fields": [
+                    {
+                      "name": "issue",
+                      "expression": "`issue`"
+                    },
+                    {
+                      "name": "action",
+                      "expression": "`action`"
+                    },
+                    {
+                      "name": "planted",
+                      "expression": "`planted`"
+                    },
+                    {
+                      "name": "detected",
+                      "expression": "`detected`"
+                    },
+                    {
+                      "name": "all_match",
+                      "expression": "`all_match`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "issue",
+                    "displayName": "Problem"
+                  },
+                  {
+                    "fieldName": "action",
+                    "displayName": "Action"
+                  },
+                  {
+                    "fieldName": "planted",
+                    "displayName": "Planted"
+                  },
+                  {
+                    "fieldName": "detected",
+                    "displayName": "Detected"
+                  },
+                  {
+                    "fieldName": "all_match",
+                    "displayName": "All match"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Data quality gate: planted vs detected"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 18,
+            "width": 6,
+            "height": 5
           }
         }
       ]
