@@ -1,0 +1,6 @@
+resources:
+  dashboards:
+    supply_chain_overview:
+      display_name: Supply chain overview
+      file_path: ../dashboards/supply_chain.lvdash.json
+      warehouse_id: ${var.warehouse_id}

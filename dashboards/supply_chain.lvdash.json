@@ -1,0 +1,699 @@
+{
+  "datasets": [
+    {
+      "name": "headline",
+      "displayName": "Headline numbers",
+      "queryLines": [
+        "select\n",
+        "  (select round(sum(on_schedule_qty) / sum(scheduled_qty), 3) from workspace.sc_gold.kpi_schedule_adherence\n",
+        "     where week_start >= (select date_sub(max(week_start), 21) from workspace.sc_gold.kpi_schedule_adherence)) as adherence_last_4_weeks,\n",
+        "  (select min(adherence) from (select week_start, sum(on_schedule_qty) / sum(scheduled_qty) as adherence\n",
+        "     from workspace.sc_gold.kpi_schedule_adherence group by week_start)) as worst_week_adherence,\n",
+        "  (select count(*) from workspace.sc_gold.kpi_stockout_risk) as materials_at_risk_today,\n",
+        "  (select count(*) from workspace.sc_gold.fct_purchase_lines\n",
+        "     where not is_fully_received and promised_date < (select max(date_day) from workspace.sc_gold.kpi_stock_coverage)) as overdue_order_lines,\n",
+        "  (select round(sum(lines_on_time) / sum(lines_completed), 3) from workspace.sc_gold.kpi_supplier_performance) as supplier_on_time_rate,\n",
+        "  (select count(*) from workspace.sc_gold.kpi_stock_coverage where is_stockout) as stockout_material_days\n"
+      ]
+    },
+    {
+      "name": "adherence_weekly",
+      "displayName": "Schedule adherence by week",
+      "queryLines": [
+        "select week_start, round(sum(on_schedule_qty) / sum(scheduled_qty), 3) as adherence\n",
+        "from workspace.sc_gold.kpi_schedule_adherence group by week_start order by week_start\n"
+      ]
+    },
+    {
+      "name": "risk_weekly",
+      "displayName": "Materials at risk by week",
+      "queryLines": [
+        "select date_trunc('week', date_day)::date as week_start,\n",
+        "  count(distinct case when is_at_risk and not is_stockout then material_code end) as at_risk_in_stock,\n",
+        "  count(distinct case when is_stockout then material_code end) as out_of_stock\n",
+        "from workspace.sc_gold.kpi_stock_coverage group by 1 order by 1\n"
+      ]
+    },
+    {
+      "name": "risk_list",
+      "displayName": "Materials at risk today",
+      "queryLines": [
+        "select material_code, description, material_type_name,\n",
+        "  coalesce(main_supplier_name, '(produced in-house)') as supplier, is_imported,\n",
+        "  cast(closing_stock as decimal(18,1)) as closing_stock, cast(safety_stock as decimal(18,1)) as safety_stock,\n",
+        "  cast(on_order_qty as decimal(18,1)) as on_order_qty, cast(overdue_qty as decimal(18,1)) as overdue_qty,\n",
+        "  coverage_days, days_at_risk_last_2_weeks\n",
+        "from workspace.sc_gold.kpi_stockout_risk order by overdue_qty desc, coverage_days\n"
+      ]
+    },
+    {
+      "name": "suppliers",
+      "displayName": "Supplier performance",
+      "queryLines": [
+        "select supplier_code, country, is_importer, lines_ordered, lines_completed,\n",
+        "  on_time_rate, avg_lead_time_days, max_days_late\n",
+        "from workspace.sc_gold.kpi_supplier_performance order by on_time_rate nulls last\n"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "overview",
+      "displayName": "Overview",
+      "layout": [
+        {
+          "widget": {
+            "name": "intro",
+            "multilineTextboxSpec": {
+              "lines": [
+                "# Supply chain overview\n",
+                "Simulated auto-parts supplier, Q1 2026. Built by [supply-chain-lakehouse](https://github.com/estefersonsampaio/supply-chain-lakehouse): ERP extracts \u2192 bronze \u2192 silver (data quality gate) \u2192 dbt gold. All data is simulated."
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 6,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "c_adherence_last_4_weeks",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "headline",
+                  "fields": [
+                    {
+                      "name": "adherence_last_4_weeks",
+                      "expression": "`adherence_last_4_weeks`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "adherence_last_4_weeks",
+                  "displayName": "Schedule adherence, last 4 weeks",
+                  "format": {
+                    "type": "number-percent",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 1
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Schedule adherence, last 4 weeks"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 1,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "c_worst_week_adherence",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "headline",
+                  "fields": [
+                    {
+                      "name": "worst_week_adherence",
+                      "expression": "`worst_week_adherence`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "worst_week_adherence",
+                  "displayName": "Worst week adherence",
+                  "format": {
+                    "type": "number-percent",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 1
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Worst week adherence"
+              }
+            }
+          },
+          "position": {
+            "x": 1,
+            "y": 2,
+            "width": 1,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "c_materials_at_risk_today",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "headline",
+                  "fields": [
+                    {
+                      "name": "materials_at_risk_today",
+                      "expression": "`materials_at_risk_today`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "materials_at_risk_today",
+                  "displayName": "Materials at risk today"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Materials at risk today"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 2,
+            "width": 1,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "c_overdue_order_lines",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "headline",
+                  "fields": [
+                    {
+                      "name": "overdue_order_lines",
+                      "expression": "`overdue_order_lines`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "overdue_order_lines",
+                  "displayName": "Overdue purchase order lines"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Overdue purchase order lines"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 2,
+            "width": 1,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "c_supplier_on_time_rate",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "headline",
+                  "fields": [
+                    {
+                      "name": "supplier_on_time_rate",
+                      "expression": "`supplier_on_time_rate`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "supplier_on_time_rate",
+                  "displayName": "Supplier on-time rate",
+                  "format": {
+                    "type": "number-percent",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 1
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Supplier on-time rate"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 2,
+            "width": 1,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "c_stockout_material_days",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "headline",
+                  "fields": [
+                    {
+                      "name": "stockout_material_days",
+                      "expression": "`stockout_material_days`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "stockout_material_days",
+                  "displayName": "Stockout material-days"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Stockout material-days"
+              }
+            }
+          },
+          "position": {
+            "x": 5,
+            "y": 2,
+            "width": 1,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "adherence_chart",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "adherence_weekly",
+                  "fields": [
+                    {
+                      "name": "week_start",
+                      "expression": "`week_start`"
+                    },
+                    {
+                      "name": "adherence",
+                      "expression": "`adherence`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "week_start",
+                  "scale": {
+                    "type": "temporal"
+                  },
+                  "displayName": "Week"
+                },
+                "y": {
+                  "fieldName": "adherence",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Adherence",
+                  "format": {
+                    "type": "number-percent",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 0
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Schedule adherence by week (shipped on the day vs firm schedule)"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 5,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "risk_chart",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "risk_weekly",
+                  "fields": [
+                    {
+                      "name": "week_start",
+                      "expression": "`week_start`"
+                    },
+                    {
+                      "name": "at_risk_in_stock",
+                      "expression": "`at_risk_in_stock`"
+                    },
+                    {
+                      "name": "out_of_stock",
+                      "expression": "`out_of_stock`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "week_start",
+                  "scale": {
+                    "type": "temporal"
+                  },
+                  "displayName": "Week"
+                },
+                "y": {
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "fields": [
+                    {
+                      "fieldName": "at_risk_in_stock",
+                      "displayName": "At risk (still in stock)"
+                    },
+                    {
+                      "fieldName": "out_of_stock",
+                      "displayName": "Out of stock"
+                    }
+                  ]
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Materials at risk and out of stock, by week"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 5,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "risk_table",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "risk_list",
+                  "fields": [
+                    {
+                      "name": "material_code",
+                      "expression": "`material_code`"
+                    },
+                    {
+                      "name": "description",
+                      "expression": "`description`"
+                    },
+                    {
+                      "name": "material_type_name",
+                      "expression": "`material_type_name`"
+                    },
+                    {
+                      "name": "supplier",
+                      "expression": "`supplier`"
+                    },
+                    {
+                      "name": "is_imported",
+                      "expression": "`is_imported`"
+                    },
+                    {
+                      "name": "closing_stock",
+                      "expression": "`closing_stock`"
+                    },
+                    {
+                      "name": "safety_stock",
+                      "expression": "`safety_stock`"
+                    },
+                    {
+                      "name": "on_order_qty",
+                      "expression": "`on_order_qty`"
+                    },
+                    {
+                      "name": "overdue_qty",
+                      "expression": "`overdue_qty`"
+                    },
+                    {
+                      "name": "coverage_days",
+                      "expression": "`coverage_days`"
+                    },
+                    {
+                      "name": "days_at_risk_last_2_weeks",
+                      "expression": "`days_at_risk_last_2_weeks`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "material_code",
+                    "displayName": "Material"
+                  },
+                  {
+                    "fieldName": "description",
+                    "displayName": "Description"
+                  },
+                  {
+                    "fieldName": "material_type_name",
+                    "displayName": "Type"
+                  },
+                  {
+                    "fieldName": "supplier",
+                    "displayName": "Supplier"
+                  },
+                  {
+                    "fieldName": "is_imported",
+                    "displayName": "Imported"
+                  },
+                  {
+                    "fieldName": "closing_stock",
+                    "displayName": "Stock"
+                  },
+                  {
+                    "fieldName": "safety_stock",
+                    "displayName": "Safety stock"
+                  },
+                  {
+                    "fieldName": "on_order_qty",
+                    "displayName": "On order"
+                  },
+                  {
+                    "fieldName": "overdue_qty",
+                    "displayName": "Overdue"
+                  },
+                  {
+                    "fieldName": "coverage_days",
+                    "displayName": "Coverage (days)"
+                  },
+                  {
+                    "fieldName": "days_at_risk_last_2_weeks",
+                    "displayName": "Days at risk, last 2 weeks"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Materials at risk today (the planner's morning list)"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 11,
+            "width": 6,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "supplier_table",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "suppliers",
+                  "fields": [
+                    {
+                      "name": "supplier_code",
+                      "expression": "`supplier_code`"
+                    },
+                    {
+                      "name": "country",
+                      "expression": "`country`"
+                    },
+                    {
+                      "name": "is_importer",
+                      "expression": "`is_importer`"
+                    },
+                    {
+                      "name": "lines_ordered",
+                      "expression": "`lines_ordered`"
+                    },
+                    {
+                      "name": "lines_completed",
+                      "expression": "`lines_completed`"
+                    },
+                    {
+                      "name": "on_time_rate",
+                      "expression": "`on_time_rate`"
+                    },
+                    {
+                      "name": "avg_lead_time_days",
+                      "expression": "`avg_lead_time_days`"
+                    },
+                    {
+                      "name": "max_days_late",
+                      "expression": "`max_days_late`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "supplier_code",
+                    "displayName": "Supplier"
+                  },
+                  {
+                    "fieldName": "country",
+                    "displayName": "Country"
+                  },
+                  {
+                    "fieldName": "is_importer",
+                    "displayName": "Importer"
+                  },
+                  {
+                    "fieldName": "lines_ordered",
+                    "displayName": "Lines ordered"
+                  },
+                  {
+                    "fieldName": "lines_completed",
+                    "displayName": "Lines completed"
+                  },
+                  {
+                    "fieldName": "on_time_rate",
+                    "displayName": "On-time rate",
+                    "format": {
+                      "type": "number-percent",
+                      "decimalPlaces": {
+                        "type": "max",
+                        "places": 0
+                      }
+                    }
+                  },
+                  {
+                    "fieldName": "avg_lead_time_days",
+                    "displayName": "Avg lead time (days)"
+                  },
+                  {
+                    "fieldName": "max_days_late",
+                    "displayName": "Max days late"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Supplier performance (completed purchase order lines)"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 14,
+            "width": 6,
+            "height": 6
+          }
+        }
+      ]
+    }
+  ]
+}
