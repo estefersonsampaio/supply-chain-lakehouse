@@ -6,8 +6,10 @@ recomputing everything takes seconds; an incremental MERGE is a possible next st
 Tables written to the silver schema:
 
     <one per extract>    clean data with English column names and real types
-    quarantine           rows that could not be fixed, with the reason and the raw record
-    dq_summary           rows in, duplicates removed, rows quarantined, rows out
+    quarantine           rows that could not be fixed: reason, raw record, ERP record
+                         number, and status (open, or resolved once the source sends a
+                         valid version of the same record), with days open
+    dq_summary           rows in, duplicates removed, rows quarantined (open/resolved), rows out
     dq_reconciliation    problems detected vs problems planted by the generator
 
 If detected and planted do not match for any extract and problem, the task fails after
@@ -49,12 +51,23 @@ def main() -> None:
             valid_materials = spark.table(f"{silver}.materials")
         quarantines.append(out.quarantine)
         quarantined = out.quarantine.count()
+        still_open = out.quarantine.filter("status = 'open'").count()
         rows_out = spark.table(f"{silver}.{spec.extract}").count()
         detected[spec.extract] = {"duplicate": out.duplicates_removed, **out.flags}
-        summary.append((spec.extract, out.rows_in, out.duplicates_removed, quarantined, rows_out))
+        summary.append(
+            (
+                spec.extract,
+                out.rows_in,
+                out.duplicates_removed,
+                quarantined,
+                still_open,
+                quarantined - still_open,
+                rows_out,
+            )
+        )
         print(
             f"{spec.extract:<20} in={out.rows_in:>7} dup={out.duplicates_removed:>5} "
-            f"quarantine={quarantined:>5} out={rows_out:>7}"
+            f"quarantine={quarantined:>5} (open={still_open:>4}) out={rows_out:>7}"
         )
 
     all_quarantine = quarantines[0]
@@ -64,8 +77,8 @@ def main() -> None:
     write(
         spark.createDataFrame(
             summary,
-            "extract string, rows_in long, duplicates_removed long, "
-            "rows_quarantined long, rows_out long",
+            "extract string, rows_in long, duplicates_removed long, rows_quarantined long, "
+            "quarantine_open long, quarantine_resolved long, rows_out long",
         ),
         f"{silver}.dq_summary",
     )

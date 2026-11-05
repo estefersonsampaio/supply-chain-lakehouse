@@ -115,6 +115,7 @@ def _po_row(**overrides):
         "C7_QUANT": "12.5",
         "C7_EMISSAO": "20260105",
         "C7_DATPRF": "20260115",
+        "R_E_C_N_O_": "1",
         "_source_file": "f.csv",
         "_file_date": date(2026, 1, 5),
     }
@@ -161,3 +162,29 @@ def test_unfixable_rows_go_to_quarantine(spark, override, reason):
 def test_exact_duplicates_in_a_file_are_removed(spark):
     result = _run_po(spark, [_po_row(), _po_row(), _po_row(_source_file="g.csv")])
     assert result.duplicates_removed == 1
+
+
+def test_quarantine_is_resolved_when_the_source_sends_the_fix(spark):
+    """Same ERP record number, valid version in a later file -> resolved."""
+    bad = _po_row(C7_QUANT="-5", _file_date=date(2026, 1, 5), _source_file="d1.csv")
+    fixed = _po_row(_file_date=date(2026, 1, 8), _source_file="d4.csv")
+    other_bad = _po_row(C7_ITEM="0002", C7_QUANT="0", R_E_C_N_O_="2", _file_date=date(2026, 1, 6))
+    latest = _po_row(C7_NUM="000009", R_E_C_N_O_="3", _file_date=date(2026, 1, 12))
+    result = _run_po(spark, [bad, fixed, other_bad, latest])
+    rows = {r.erp_record_id: r for r in result.quarantine.collect()}
+    assert rows[1].status == "resolved"
+    assert rows[1].resolved_on == date(2026, 1, 8) and rows[1].days_open == 3
+    assert rows[2].status == "open" and rows[2].days_open == 6  # until 12/01, the last file
+
+
+def test_generated_corrections_resolve_quarantine(silver_run):
+    _, results = silver_run
+    statuses = {}
+    for extract, result in results.items():
+        for row in result.quarantine.select("status").collect():
+            statuses.setdefault(extract, []).append(row.status)
+    # snapshots come again every day, so their problems are fixed by the next file
+    assert "resolved" in statuses["materials"] + statuses["bom"]
+    # transactions are fixed when the generator re-sends the corrected record
+    transactional = [s for e, v in statuses.items() if e not in ("materials", "bom") for s in v]
+    assert "resolved" in transactional and "open" in transactional

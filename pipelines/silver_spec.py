@@ -10,6 +10,10 @@ Kinds:
     qty   quantity -> DECIMAL(18,3); decimal commas are fixed; negative values (and zero,
           unless zero is valid for the extract) are quarantined
     unit  unit of measure, normalized to PC / KG / L (grams are converted to KG)
+
+Every extract carries the ERP internal record number (R_E_C_N_O_ -> erp_record_id). It
+never changes, so it links a quarantined row to the corrected version that the source
+sends later.
 """
 
 from dataclasses import dataclass
@@ -50,6 +54,7 @@ SPECS: tuple[SilverSpec, ...] = (
             Col("B1_PE", "lead_time_days", "int"),
             Col("B1_ESTSEG", "safety_stock", "qty"),
             Col("B1_PROC", "main_supplier_code", "id"),
+            Col("R_E_C_N_O_", "erp_record_id", "int"),
         ),
         key=("material_code",),
         snapshot=True,
@@ -61,6 +66,7 @@ SPECS: tuple[SilverSpec, ...] = (
             Col("G1_COD", "parent_material_code", "code"),
             Col("G1_COMP", "component_material_code", "code"),
             Col("G1_QUANT", "qty_per", "qty"),
+            Col("R_E_C_N_O_", "erp_record_id", "int"),
         ),
         key=("parent_material_code", "component_material_code"),
         snapshot=True,
@@ -73,6 +79,7 @@ SPECS: tuple[SilverSpec, ...] = (
             Col("A2_LOJA", "store", "id"),
             Col("A2_NOME", "name"),
             Col("A2_PAIS", "country"),
+            Col("R_E_C_N_O_", "erp_record_id", "int"),
         ),
         key=("supplier_code",),
         snapshot=True,
@@ -84,6 +91,7 @@ SPECS: tuple[SilverSpec, ...] = (
             Col("A1_LOJA", "store", "id"),
             Col("A1_NOME", "name"),
             Col("A1_PAIS", "country"),
+            Col("R_E_C_N_O_", "erp_record_id", "int"),
         ),
         key=("customer_code",),
         snapshot=True,
@@ -99,6 +107,7 @@ SPECS: tuple[SilverSpec, ...] = (
             Col("ZA1_DTENT", "due_date", "date"),
             Col("ZA1_QUANT", "quantity", "qty"),
             Col("ZA1_TIPO", "schedule_type"),
+            Col("R_E_C_N_O_", "erp_record_id", "int"),
         ),
         key=("customer_code", "material_code", "release_number", "due_date"),
         references=("material_code",),
@@ -116,6 +125,7 @@ SPECS: tuple[SilverSpec, ...] = (
             Col("C7_QUANT", "quantity", "qty"),
             Col("C7_EMISSAO", "order_date", "date"),
             Col("C7_DATPRF", "promised_date", "date"),
+            Col("R_E_C_N_O_", "erp_record_id", "int"),
         ),
         key=("po_number", "po_item"),
         references=("material_code",),
@@ -131,6 +141,7 @@ SPECS: tuple[SilverSpec, ...] = (
             Col("D1_COD", "material_code", "code"),
             Col("D1_QUANT", "quantity", "qty"),
             Col("D1_DTDIGIT", "receipt_date", "date"),
+            Col("R_E_C_N_O_", "erp_record_id", "int"),
         ),
         key=("invoice_number", "po_number", "po_item"),
         references=("material_code",),
@@ -144,6 +155,7 @@ SPECS: tuple[SilverSpec, ...] = (
             Col("D3_LOCAL", "warehouse", "id"),
             Col("D3_QUANT", "quantity", "qty"),
             Col("D3_EMISSAO", "movement_date", "date"),
+            Col("R_E_C_N_O_", "erp_record_id", "int"),
         ),
         key=("movement_doc",),
         references=("material_code",),
@@ -158,6 +170,7 @@ SPECS: tuple[SilverSpec, ...] = (
             Col("D2_COD", "material_code", "code"),
             Col("D2_QUANT", "quantity", "qty"),
             Col("D2_EMISSAO", "shipment_date", "date"),
+            Col("R_E_C_N_O_", "erp_record_id", "int"),
         ),
         key=("shipment_doc", "shipment_item"),
         references=("material_code",),

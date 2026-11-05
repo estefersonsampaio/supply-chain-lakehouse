@@ -169,9 +169,42 @@ def build_silver(
     quarantine = flagged.filter(F.col("_quarantine_reason").isNotNull()).select(
         F.lit(spec.extract).alias("extract"),
         F.col("_quarantine_reason").alias("reason"),
+        "erp_record_id",
         F.to_json(F.struct(*[F.col(c) for c in spec.raw_columns])).alias("raw_record"),
         *LINEAGE,
     )
     valid = flagged.filter(F.col("_quarantine_reason").isNull())
+    as_of = bronze.agg(F.max("_file_date")).first()[0]
+    quarantine = resolve_quarantine(quarantine, valid, as_of)
     clean = latest_per_key(valid, spec).select(*[c.name for c in spec.columns], *LINEAGE)
     return SilverOutput(clean, quarantine, duplicates, flags, rows_in)
+
+
+def resolve_quarantine(quarantine: DataFrame, valid: DataFrame, as_of) -> DataFrame:
+    """Mark each quarantined row as resolved or open.
+
+    A row is resolved when a valid version of the same ERP record (same erp_record_id)
+    arrives in a later file: the problem was fixed at the source. days_open counts
+    calendar days from the file with the problem to the fix, or to the latest file
+    (as_of) while it is still open.
+    """
+    fixes = valid.select(
+        F.col("erp_record_id").alias("_fix_id"), F.col("_file_date").alias("_fix_date")
+    )
+    columns = quarantine.columns
+    resolved = (
+        quarantine.join(
+            fixes,
+            (F.col("erp_record_id") == F.col("_fix_id"))
+            & (F.col("_fix_date") > F.col("_file_date")),
+            "left",
+        )
+        .groupBy(*columns)
+        .agg(F.min("_fix_date").alias("resolved_on"))
+    )
+    return resolved.withColumn(
+        "status", F.when(F.col("resolved_on").isNotNull(), "resolved").otherwise("open")
+    ).withColumn(
+        "days_open",
+        F.datediff(F.coalesce(F.col("resolved_on"), F.lit(as_of)), F.col("_file_date")),
+    )
