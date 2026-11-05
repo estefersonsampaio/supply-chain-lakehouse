@@ -130,6 +130,6 @@ Controlled by `--dirty-rate` (default 2% of rows). Each affected row gets exactl
 | `code_format` | `pa0001`, ` PA0001`, code without padding |
 | `invalid_date` | `00000000`, empty, `20260230`, `20261131` |
 | `unit_variant` | `pc`, `UN`, `pcs`, `kg`, `LT`; or `G` with the quantity multiplied by 1000 |
-| `bad_quantity` | `0` or a negative quantity |
+| `bad_quantity` | `0` or a negative quantity. Where zero is a valid value (customer schedules, safety stock), always negative |
 | `decimal_comma` | `12,5` instead of `12.5` |
 | `orphan_reference` | A material code that does not exist (`XX4821`) |

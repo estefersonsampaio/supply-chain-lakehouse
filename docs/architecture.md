@@ -90,6 +90,9 @@ dbt tests: uniqueness and not-null on keys, relationships between facts and dime
 | Incremental and idempotent ingestion | Re-running a day must not duplicate data |
 | dbt for gold | SQL with tests, documentation and lineage |
 | Quarantine instead of dropping bad rows | Data problems must be visible, as they are in a real migration or integration |
+| Silver as a full refresh | Seconds at this volume and always safe to re-run; incremental MERGE is a next step |
+| A data quality gate in silver | Detected problems are reconciled with the generator manifests; any difference fails the job |
+| Silver rules as pure functions tested on local Spark | Fast feedback without a cluster, same ANSI SQL behaviour as Databricks serverless |
 | Simulated data only | No real company data, not even anonymized |
 
 ## Findings on Databricks Free Edition
