@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    name: Lint and tests (generator + silver on local Spark)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Format
+        run: uv run ruff format --check .
+
+      - name: Tests
+        run: uv run pytest -q
+
+  dbt:
+    name: dbt project parses (no warehouse needed)
+    runs-on: ubuntu-latest
+    env:
+      # dbt parse does not connect to Databricks; these only satisfy the profile.
+      DATABRICKS_HOST: example.cloud.databricks.com
+      DATABRICKS_HTTP_PATH: /sql/1.0/warehouses/ci
+      DATABRICKS_TOKEN: not-a-real-token
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Install dbt
+        run: uv sync --only-group dbt
+
+      - name: Parse dbt project
+        run: |
+          cp dbt/profiles.example.yml dbt/profiles.yml
+          uv run --only-group dbt dbt parse --project-dir dbt --profiles-dir dbt
