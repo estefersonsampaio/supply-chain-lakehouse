@@ -105,21 +105,50 @@ Quarantined rows are not dropped: they go to `sc_silver.quarantine` with the rea
 
 Silver is a full refresh (overwrite) on every run: at this volume it takes seconds and makes re-runs always safe. An incremental `MERGE` is a possible next step.
 
+## Gold: star schema and supply chain KPIs with dbt
+
+The [dbt project](dbt/) builds the gold layer on the Databricks SQL warehouse and runs as the third task of the job (`dbt build`: 12 models, 42 data tests).
+
+- **Dimensions:** `dim_material`, `dim_supplier`, `dim_customer`, `dim_date`.
+- **Facts:** `fct_customer_schedule` (the last word of the customer for each due date), `fct_shipments`, `fct_purchase_lines` (ordered vs received, lead time, lateness), `fct_inventory_daily` (closing stock rebuilt from every movement).
+- **KPIs:**
+
+| Model | Question it answers |
+|---|---|
+| `kpi_stock_coverage` | How many days does the stock cover, and is the material at risk? Components follow MRP logic (stock + open orders − demand during the lead time vs safety stock), and open orders past their promised date are shown as overdue. |
+| `kpi_stockout_risk` | The planner's morning list: materials at risk today, with stock, open and overdue orders and supplier. |
+| `kpi_supplier_performance` | On-time rate, lead time and lateness per supplier. |
+| `kpi_schedule_adherence` | Did we ship what the customer scheduled, on the day they scheduled it? |
+
+Tests cover keys, relationships between facts and dimensions, accepted values, value ranges and business rules (no receipt before its order, no receipt above the ordered quantity). A warning-level test reports negative stock: it can appear when silver quarantines movements, which is a real consequence of source data problems.
+
+**What the KPIs show in the simulated quarter.** A domestic supplier promised 2,500 lock plates for 10 March and delivered them partially on 16 March and the rest on 24 March. The component ran out on 13 March, two finished products that use it ran out from 16 to 26 March, and weekly schedule adherence dropped from 98-99% to 58% and 75%. The risk KPI flagged the component on 9 March, four business days before it ran out, when its stock fell below safety stock, and showed the 2,500 pieces as overdue from 11 March.
+
+| Week | Schedule adherence |
+|---|---:|
+| 2 Mar | 98.3% |
+| 9 Mar | 98.9% |
+| 16 Mar | **57.8%** |
+| 23 Mar | **75.3%** |
+| 30 Mar | 98.7% |
+
+To run dbt from your machine, see [dbt/profiles.example.yml](dbt/profiles.example.yml) (it uses a short-lived token from the Databricks CLI, so no personal access token is needed).
+
 ## Tests
 
 ```bash
 uv run pytest
 ```
 
-31 tests: the generator (reproducibility, integrity of clean data, manifest accuracy) and the silver rules on local Spark, including an end-to-end check that every problem planted in a generated dataset is detected. Local Spark needs Java 17 or 21 (`brew install openjdk@17` on macOS; `tests/conftest.py` picks it up).
+31 Python tests (plus the 42 dbt data tests above): the generator (reproducibility, integrity of clean data, manifest accuracy) and the silver rules on local Spark, including an end-to-end check that every problem planted in a generated dataset is detected. Local Spark needs Java 17 or 21 (`brew install openjdk@17` on macOS; `tests/conftest.py` picks it up).
 
 ## Roadmap
 
 - [x] Data generator with planted data problems
 - [x] Bronze: incremental ingestion
 - [x] Silver: cleaning, deduplication, quarantine, data quality gate
-- [ ] Gold: dbt star schema, KPIs and tests
-- [ ] Databricks Job deployed as code
+- [x] Gold: dbt star schema, KPIs and tests
+- [x] Databricks Job deployed as code (bronze -> silver -> gold)
 - [ ] CI with GitHub Actions
 - [ ] Dashboard
 - [ ] How to run it yourself

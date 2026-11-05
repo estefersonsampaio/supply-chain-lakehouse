@@ -68,18 +68,19 @@ Rows that cannot be fixed go to quarantine tables with the reason, instead of be
 Star schema:
 
 - dimensions: `dim_material`, `dim_supplier`, `dim_customer`, `dim_date`;
-- facts: `fct_customer_schedule` (latest firm release per day), `fct_inventory_daily`, `fct_purchase_receipts`, `fct_shipments`.
+- facts: `fct_customer_schedule` (quantity of the latest release issued before each due date), `fct_shipments`, `fct_purchase_lines` (ordered vs received per order line), `fct_inventory_daily` (closing stock per material and business day, rebuilt from all movements).
 
-KPI marts:
+KPI models:
 
-| KPI | Definition (first version) |
+| KPI | Definition |
 |---|---|
-| Stock coverage (days) | Current stock divided by average daily firm demand for the next N days |
-| Stockout risk | Materials whose projected stock goes below safety stock within the supplier lead time |
-| Supplier lead time and on-time rate | Days from order to receipt, and share of lines received by the promised date |
-| Schedule adherence | Shipped quantity versus scheduled quantity per customer, material and day |
+| Stock coverage (days) | Closing stock / average daily demand. Finished products: firm customer demand over the next 10 business days. Components: consumption over the last 10 business days |
+| Stockout risk (components) | Projected stock = stock + open purchase orders − daily demand × lead time (business days). At risk if projected stock or current stock is below safety stock, or stock is zero. Open quantity past its promised date is reported as overdue |
+| Stockout risk (finished products) | Produced every day, so at risk when stock is below safety stock or zero (production is not keeping up) |
+| Supplier lead time and on-time rate | Days from order to the last receipt, and share of completed lines received by the promised date |
+| Schedule adherence | min(shipped, scheduled) / scheduled per customer, material and day, for firm demand |
 
-dbt tests: uniqueness and not-null on keys, relationships between facts and dimensions, accepted values, and business rules (for example: no receipt before its purchase order).
+dbt tests: uniqueness and not-null on keys, relationships between facts and dimensions, accepted values, value ranges and business rules (no receipt before its order, no receipt above the ordered quantity). Negative rebuilt stock is a warning, because quarantined movements can cause it.
 
 ## Key decisions
 
@@ -92,6 +93,7 @@ dbt tests: uniqueness and not-null on keys, relationships between facts and dime
 | Quarantine instead of dropping bad rows | Data problems must be visible, as they are in a real migration or integration |
 | Silver as a full refresh | Seconds at this volume and always safe to re-run; incremental MERGE is a next step |
 | A data quality gate in silver | Detected problems are reconciled with the generator manifests; any difference fails the job |
+| Risk KPI counts open orders, but flags overdue ones | A first version ignored open orders and flagged every imported component; a second one trusted them blindly and only flagged a stockout on the day it happened. The final rule matches how a planner reads it |
 | Silver rules as pure functions tested on local Spark | Fast feedback without a cluster, same ANSI SQL behaviour as Databricks serverless |
 | Simulated data only | No real company data, not even anonymized |
 
