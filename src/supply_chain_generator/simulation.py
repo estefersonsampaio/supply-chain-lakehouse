@@ -27,6 +27,7 @@ from supply_chain_generator.business_calendar import (
 )
 from supply_chain_generator.config import GeneratorConfig
 from supply_chain_generator.extracts import (
+    RECORD_NUMBER,
     TM_CONSUMPTION,
     TM_INITIAL_BALANCE,
     TM_PRODUCTION_ENTRY,
@@ -38,6 +39,13 @@ from supply_chain_generator.master_data import MasterData, build_master_data
 STORE = "01"  # ERP "loja" (branch of a customer or supplier)
 WAREHOUSE = "01"
 PRODUCTION_COVER_DAYS = 2
+TRANSACTIONS = (
+    "customer_schedules",
+    "purchase_orders",
+    "goods_receipts",
+    "inventory_movements",
+    "shipments",
+)
 
 
 @dataclass
@@ -90,6 +98,13 @@ class Simulator:
 
     # ---------------------------------------------------------------- snapshots
     def master_rows(self) -> dict[str, list[dict[str, str]]]:
+        rows = self._master_rows()
+        for extract_rows in rows.values():  # stable record number per master record
+            for i, row in enumerate(extract_rows, start=1):
+                row[RECORD_NUMBER] = str(i)
+        return rows
+
+    def _master_rows(self) -> dict[str, list[dict[str, str]]]:
         m = self.master
         return {
             "materials": [
@@ -346,4 +361,7 @@ class Simulator:
             out.rows["shipments"] = self._ship(day)
             out.rows["customer_schedules"] = self._release_schedules(day)
             out.rows["purchase_orders"] = self._purchase(day)
+            for name in TRANSACTIONS:
+                for row in out.rows[name]:
+                    row[RECORD_NUMBER] = str(int(self._next(f"recno:{name}", 1)))
             yield out

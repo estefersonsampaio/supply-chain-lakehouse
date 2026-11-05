@@ -8,7 +8,7 @@ removed 37").
 
 import random
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from supply_chain_generator.extracts import MATERIAL_CODE_WIDTH, ExtractSpec, format_qty
 
@@ -34,10 +34,20 @@ UNIT_ALIASES = {"PC": ("pc", "UN", "pcs"), "KG": ("kg", "Kg"), "L": ("LT", "l")}
 IMPOSSIBLE_DATES = ("00000000", "", "{year}0230", "{year}1131", "{year}0431")
 
 
+# Problems that silver cannot fix and sends to quarantine. In a real company the business
+# corrects them in the ERP and the corrected record arrives in a later extract. For
+# transactions, the generator does the same with a share of them.
+QUARANTINABLE = (INVALID_DATE, BAD_QUANTITY, ORPHAN_REFERENCE)
+CORRECTION_RATE = 0.7
+CORRECTION_DELAY_DAYS = (1, 7)  # business days until the corrected record is re-sent
+
+
 @dataclass
 class DirtResult:
     rows: list[dict[str, str]]
     counts: Counter
+    # (business days from now, clean record) to re-send later, as the source's fix
+    corrections: list[tuple[int, dict[str, str]]] = field(default_factory=list)
 
 
 def applicable_issues(spec: ExtractSpec) -> list[str]:
@@ -64,6 +74,7 @@ def inject(
 
     issues = applicable_issues(spec)
     out: list[dict[str, str]] = []
+    corrections: list[tuple[int, dict[str, str]]] = []
     for original in rows:
         row = dict(original)
         if rng.random() >= rate:
@@ -77,7 +88,9 @@ def inject(
             continue
         _apply(issue, row, spec, rng)
         out.append(row)
-    return DirtResult(rows=out, counts=counts)
+        if issue in QUARANTINABLE and not spec.snapshot and rng.random() < CORRECTION_RATE:
+            corrections.append((rng.randint(*CORRECTION_DELAY_DAYS), dict(original)))
+    return DirtResult(rows=out, counts=counts, corrections=corrections)
 
 
 def _apply(issue: str, row: dict[str, str], spec: ExtractSpec, rng: random.Random) -> None:

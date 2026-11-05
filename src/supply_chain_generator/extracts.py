@@ -6,7 +6,7 @@ characters, as fixed-width ERP fields usually are. The silver layer translates a
 this into clean English names; the mapping is in docs/data-dictionary.md.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 MATERIAL_CODE_WIDTH = 15
 
@@ -135,6 +135,14 @@ EXTRACTS: dict[str, ExtractSpec] = {
             qty_columns=("D2_QUANT",),
         ),
     )
+}
+
+# Every ERP table has an internal record number that never changes, whatever happens to
+# the other fields. It is what lets silver recognise that a corrected row re-sent by the
+# source is the same record that was quarantined before.
+RECORD_NUMBER = "R_E_C_N_O_"
+EXTRACTS = {
+    name: replace(spec, columns=(*spec.columns, RECORD_NUMBER)) for name, spec in EXTRACTS.items()
 }
 
 # Inventory movement types (D3_TM). As in many ERPs, codes up to 499 are entries and

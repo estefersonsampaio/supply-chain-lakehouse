@@ -160,7 +160,11 @@ def test_manifest_counts_match_files(dirty):
         for name, info in manifest["extracts"].items():
             rows = read(out / name / f"{name}_{stamp}.csv")
             assert len(rows) == info["rows_written"]
-            assert info["rows_written"] == info["clean_rows"] + info["planted"].get("duplicate", 0)
+            assert info["rows_written"] == (
+                info["clean_rows"]
+                + info["planted"].get("duplicate", 0)
+                + info["corrections_resent"]
+            )
 
 
 def test_duplicates_are_exact_copies(dirty):
@@ -225,3 +229,33 @@ def test_bad_quantity_is_negative_where_zero_is_valid():
     planted = [q for q in changed if q not in originals]
     assert len(planted) == result.counts["bad_quantity"]
     assert all(float(q) < 0 for q in planted)
+
+
+def test_record_numbers_are_unique_in_clean_transactions(clean):
+    for name, spec in EXTRACTS.items():
+        if spec.snapshot:
+            continue
+        numbers = [r["R_E_C_N_O_"] for r in read_all(clean, name)]
+        assert len(numbers) == len(set(numbers)), name
+
+
+def test_corrections_are_resent_later_with_the_same_record_number(dirty):
+    """A quarantinable problem fixed at the source comes back clean in a later file."""
+    out, manifests = dirty
+    resent_total = sum(m["extracts"][n]["corrections_resent"] for m in manifests for n in EXTRACTS)
+    assert resent_total > 0
+    for name, spec in EXTRACTS.items():
+        if spec.snapshot:
+            assert all(m["extracts"][name]["corrections_resent"] == 0 for m in manifests)
+            continue
+        seen: dict[str, list[tuple[str, dict]]] = {}
+        for path in sorted((out / name).glob("*.csv")):
+            stamp = path.stem.rsplit("_", 1)[-1]
+            for row in read(path):
+                seen.setdefault(row["R_E_C_N_O_"], []).append((stamp, row))
+        repeated = {k: v for k, v in seen.items() if len({s for s, _ in v}) > 1}
+        expected = sum(m["extracts"][name]["corrections_resent"] for m in manifests)
+        assert len(repeated) == expected, name
+        for versions in repeated.values():
+            (first_day, first), (last_day, last) = versions[0], versions[-1]
+            assert last_day > first_day and last != first
