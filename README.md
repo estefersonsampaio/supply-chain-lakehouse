@@ -144,6 +144,8 @@ A Databricks AI/BI dashboard on the gold layer, also deployed from the bundle ([
 
 ![Supply chain overview dashboard](docs/images/dashboard.png)
 
+![Data quality page](docs/images/data-quality.png)
+
 ## Tests
 
 ```bash
