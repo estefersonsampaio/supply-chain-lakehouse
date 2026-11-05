@@ -92,8 +92,13 @@ dbt tests: uniqueness and not-null on keys, relationships between facts and dime
 | Quarantine instead of dropping bad rows | Data problems must be visible, as they are in a real migration or integration |
 | Simulated data only | No real company data, not even anonymized |
 
-## Open questions (to check on Free Edition)
+## Findings on Databricks Free Edition
 
-- Limits for Jobs, dashboards, Git folders and the SQL warehouse used by dbt.
-- Whether external cloud storage (ADLS or S3) can be read. If not, the landing zone stays in a Unity Catalog volume.
-- Whether personal access tokens and the Databricks CLI work for deploying the bundle.
+- The Databricks CLI works with OAuth login (no personal token stored), and Asset Bundles deploy schemas, volumes and jobs.
+- Jobs run on serverless compute; a small run takes about 3 minutes including start-up.
+- There is one serverless SQL warehouse (2X-Small), which dbt will use.
+- External cloud storage (ADLS or S3) cannot be registered: only Databricks-managed storage exists. **Decision:** the landing zone is a Unity Catalog volume. Reading from external cloud storage stays as a next step for a paid workspace.
+
+## Still to check
+
+- Dashboard limits and scheduling a job on Free Edition.
