@@ -24,11 +24,34 @@ Python 3.12 · PySpark · Databricks (Free Edition) · Delta Lake · dbt · Data
 
 ## Design
 
-See [docs/architecture.md](docs/architecture.md) for the business problem, the data flow, the planted data problems and the key decisions.
+- [docs/architecture.md](docs/architecture.md): business problem, data flow, gold model, KPIs and key decisions.
+- [docs/data-dictionary.md](docs/data-dictionary.md): every raw ERP column, its clean name and the planted data problems.
+
+## The data generator
+
+A small Python package (no dependencies) simulates the plant day by day: customers send delivery schedules, production follows the firm demand and the bill of materials, shipments go out, and a simple MRP rule places purchase orders with domestic and importing suppliers, some of which deliver late. Then it plants data problems on purpose (duplicates, malformed codes, impossible dates, unit variants, bad quantities, decimal commas, orphan references) and writes one CSV per extract and business day, plus a manifest that counts every planted problem.
+
+```bash
+uv sync
+uv run python -m supply_chain_generator --days 60 --out data/landing
+```
+
+```
+44 business days written to data/landing
+  customer_schedules      18539 rows
+  inventory_movements      2275 rows
+  shipments                 905 rows
+  ...
+planted problems: bad_quantity=89, code_format=84, decimal_comma=74, duplicate=99, ...
+```
+
+The same seed always produces the same files, and adding days never changes the files of earlier days, which is what incremental ingestion needs. In a clean 90-day run (seed 42), customer service stays around 99% until an imported component arrives late in mid-March and service drops to 60-75% for two weeks: exactly the kind of event the KPIs have to show.
+
+Tests (`uv run pytest`) check reproducibility, file layout, referential integrity of the clean data, that stock never goes negative, and that the manifest matches what was actually planted.
 
 ## Roadmap
 
-- [ ] Data generator with planted data problems
+- [x] Data generator with planted data problems
 - [ ] Bronze: incremental ingestion
 - [ ] Silver: cleaning, deduplication, quarantine
 - [ ] Gold: dbt star schema, KPIs and tests
